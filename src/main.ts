@@ -5,6 +5,18 @@ import axios from 'axios';
 // Agent for routing axios requests through an HTTP(S) proxy.
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
+// Network-free parsing helpers (unit-tested in test/scrape.test.ts).
+import {
+    extractImages,
+    extractPdpName,
+    extractPdpPrice,
+    extractPreview,
+    hostnameOf,
+    isDarazProductUrl,
+    isProductImage,
+    looksBlocked,
+} from './scrape.js';
+
 await Actor.init();
 
 /** Shape of the Actor input, defined in .actor/input_schema.json */
@@ -85,18 +97,9 @@ const BROWSER_HEADERS = {
     'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
         '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
 };
-
-/** Pick a hostname out of a URL, lower-cased; returns '' if not parseable. */
-function hostnameOf(url: string): string {
-    try {
-        return new URL(url).hostname.toLowerCase();
-    } catch {
-        return '';
-    }
-}
 
 /** Build an https-proxy-agent config object for axios from a proxy URL. */
 function buildProxyAgent(proxyUrl: string) {
@@ -167,114 +170,18 @@ async function resolveFinalUrl(url: string): Promise<string | null> {
 }
 
 // ---- Daraz product page parsing ------------------------------------------
-
-const CHROME_PATH_MARKERS = ['/domino/', '/imgextra/', '/icon', '/logo', '_NP-', '/g/tps/'];
-
-/** True if a URL points at an actual product image rather than UI chrome. */
-function isProductImage(url: string): boolean {
-    let u: URL;
-    try {
-        u = new URL(url);
-    } catch {
-        return false;
-    }
-    const host = u.hostname.toLowerCase();
-    const path = u.pathname.toLowerCase();
-    if (CHROME_PATH_MARKERS.some((m) => path.includes(m))) return false;
-    if (host === 'img.drz.lazcdn.com' && path.includes('/p/')) return true;
-    if (host === 'filebroker-cdn.lazada.sg' && path.startsWith('/kf/')) return true;
-    if (host.endsWith('.slatic.net') && /\.(jpg|jpeg|png|webp)/.test(path) && !path.includes('/domino/')) return true;
-    return false;
-}
-
-/** Normalise an image URL so the same asset at different sizes dedupes to one. */
-function imageKey(url: string): string {
-    return url
-        .replace(/_\d+x\d+q\d+\.(jpg|jpeg|png|webp)(_\.webp)?$/i, '')
-        .replace(/\.(jpg|jpeg|png|webp)(_\.webp)?$/i, '')
-        .replace(/\?.*$/, '');
-}
-
-/** Collect product image URLs from a Daraz product page's HTML. */
-function extractImages(html: string): string[] {
-    const found = new Map<string, string>();
-    const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
-    if (og && isProductImage(og[1])) found.set(imageKey(og[1]), og[1]);
-    const urls = html.match(/https?:\/\/[^"'\\\s)<>]+/g) || [];
-    for (const raw of urls) {
-        const url = raw.replace(/&amp;/g, '&');
-        if (isProductImage(url)) {
-            const k = imageKey(url);
-            if (!found.has(k)) found.set(k, url);
-        }
-    }
-    return [...found.values()];
-}
-
-/** Decode the few HTML entities Daraz uses in titles/descriptions. */
-function decodeEntities(s: string | null | undefined): string | null {
-    if (!s) return null;
-    return s
-        .replace(/&amp;/g, '&')
-        .replace(/&#39;|&apos;/g, "'")
-        .replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .trim() || null;
-}
-
-const PRICE_RE = '(?:Rs\\.?|NPR|रू)\\s?[\\d,]+(?:\\.\\d+)?';
-
-/** Data extracted from a Daraz short-link "preview" page (has price + main image). */
-interface PreviewData {
-    productName: string | null;
-    salePrice: string | null;
-    listPrice: string | null;
-    mainImage: string | null;
-    trackingUrl: string | null;
-}
-
-/** Parse the share/preview page that a Daraz short link returns. */
-function extractPreview(html: string): PreviewData {
-    const desc =
-        html.match(
-            /<meta[^>]+(?:name|property)=["'](?:og:description|description)["'][^>]+content=["']([\s\S]*?)["']\s*\/?>/i,
-        )?.[1] || '';
-
-    const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
-    const productName =
-        decodeEntities(desc.match(/Product Name:\s*([\s\S]*?)(?:Product Price:|$)/i)?.[1]) || decodeEntities(ogTitle);
-
-    const listPrice = desc.match(new RegExp(`Product Price:\\s*(${PRICE_RE})`, 'i'))?.[1] || null;
-    const salePrice = desc.match(new RegExp(`Discount Price:\\s*(${PRICE_RE})`, 'i'))?.[1] || null;
-
-    const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] || null;
-
-    // The preview embeds a c.daraz.com.np tracking URL that redirects to the real product page.
-    const track =
-        html.match(/https?:\/\/c\.daraz\.com\.np\/t\/[^"'\\\s)<>]+/i)?.[0] ||
-        html.match(/REDIRECTURL\s*=\s*new URL\(['"]([^'"]+)['"]/i)?.[1] ||
-        null;
-
-    return {
-        productName,
-        salePrice,
-        listPrice,
-        mainImage: ogImage,
-        trackingUrl: track ? track.replace(/&amp;/g, '&') : null,
-    };
-}
-
-/** Detect Daraz bot-challenge / punish pages so we can report them clearly. */
-function looksBlocked(html: string): boolean {
-    if (html.length < 800) return true;
-    return /punish|slider-captcha|verify you are human|_____tmd_____/i.test(html);
-}
+// (Pure parsing helpers — isProductImage, extractImages, extractPreview,
+// looksBlocked, isDarazProductUrl — live in ./scrape.ts so they're unit-tested.)
 
 /**
  * Scrape a Daraz product starting from a Linktree short/affiliate link.
- * Price + list price come from the short-link preview page; the full image
- * gallery comes from the real product page reached via the tracking redirect.
+ * Price + list price come from the short-link preview page; the image gallery
+ * comes from the real product page reached via the tracking redirect.
+ *
+ * A dead/expired short link redirects to a home/category/search/error page
+ * instead of a product. We detect that by requiring the resolved page to be a
+ * real Daraz product URL (`isDarazProductUrl`) and report `no-product` so the
+ * importer surfaces it as broken rather than attaching a wrong image/title.
  */
 async function scrapeDarazProduct(url: string): Promise<ProductDetails> {
     const empty: ProductDetails = {
@@ -287,7 +194,8 @@ async function scrapeDarazProduct(url: string): Promise<ProductDetails> {
         detailStatus: 'error',
     };
 
-    // Step 1: the preview page (carries the price + main image).
+    // Step 1: fetch the link. For a short link this is the share/preview page;
+    // for a full product link it's already the product page (PDP).
     let previewHtml = '';
     let previewFinalUrl = url;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -310,28 +218,46 @@ async function scrapeDarazProduct(url: string): Promise<ProductDetails> {
 
     const preview = extractPreview(previewHtml);
 
-    // Step 2: follow the tracking redirect to the real product page for the gallery.
-    let images: string[] = [];
-    let resolvedUrl = previewFinalUrl;
+    // Step 2: resolve to the actual product page. Either follow the share page's
+    // tracking redirect, or use the page we already have if it's a product URL.
+    let pdpHtml = '';
+    let resolvedUrl: string | null = null;
     if (preview.trackingUrl) {
         const pdp = await getPage(preview.trackingUrl, { maxRedirects: 10, timeout: 30_000 });
-        if (pdp.data) {
-            resolvedUrl = pdp.finalUrl;
-            images = extractImages(pdp.data);
+        if (!pdp.data) {
+            return { ...empty, detailStatus: pdp.status ? `http-${pdp.status}` : 'fetch-failed' };
         }
+        pdpHtml = pdp.data;
+        resolvedUrl = pdp.finalUrl;
+    } else if (isDarazProductUrl(previewFinalUrl)) {
+        pdpHtml = previewHtml;
+        resolvedUrl = previewFinalUrl;
     }
-    // Fall back to the preview's main image if the gallery couldn't be read.
+
+    // Broken link: it never resolved to a real Daraz product page.
+    if (!isDarazProductUrl(resolvedUrl)) {
+        return { ...empty, resolvedUrl: null, images: [], detailStatus: 'no-product' };
+    }
+    if (looksBlocked(pdpHtml)) return { ...empty, resolvedUrl, detailStatus: 'blocked' };
+
+    // Images come from the product-scoped JSON-LD / og:image (see extractImages),
+    // falling back to the preview's og:image if the PDP gallery couldn't be read.
+    let images = extractImages(pdpHtml);
     if (images.length === 0 && preview.mainImage && isProductImage(preview.mainImage)) {
         images = [preview.mainImage];
     }
 
-    const price = preview.salePrice || preview.listPrice;
+    // Price/name come from the short-link preview first; fall back to the PDP
+    // HTML we already fetched (JSON-LD offers / inlined priceText / og:title),
+    // which is why the actor no longer needs scraper-service to re-scrape.
+    const price = preview.salePrice ?? preview.listPrice ?? extractPdpPrice(pdpHtml);
+    const productName = preview.productName ?? extractPdpName(pdpHtml);
     const originalPrice =
         preview.salePrice && preview.listPrice && preview.salePrice !== preview.listPrice ? preview.listPrice : null;
     const gotSomething = Boolean(price) || images.length > 0;
 
     return {
-        productName: preview.productName,
+        productName,
         price,
         originalPrice,
         discount: null,
@@ -396,9 +322,7 @@ for (const l of links) {
     if (l.type === 'GROUP') groupTitleById.set(l.id, l.title || '');
 }
 
-const filterMsg = filterTerm
-    ? `Filtering by hostname containing "${filterTerm}".`
-    : 'Returning ALL links.';
+const filterMsg = filterTerm ? `Filtering by hostname containing "${filterTerm}".` : 'Returning ALL links.';
 log.info(`Found ${links.length} total links on @${username}. ${filterMsg}`);
 
 // Build the base rows: keep only real (non-GROUP) links with a URL that match the filter.
@@ -418,7 +342,7 @@ for (const l of links) {
         expandedUrl: null,
         domain,
         type: l.type,
-        group: l.parent?.id ? groupTitleById.get(l.parent.id) ?? '' : '',
+        group: l.parent?.id ? (groupTitleById.get(l.parent.id) ?? '') : '',
         position: l.position ?? 0,
         scrapedAt,
     });
