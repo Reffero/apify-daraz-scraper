@@ -1,0 +1,17 @@
+{
+    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+    "actorSpecification": 1,
+    "name": "linktree-daraz-scraper",
+    "title": "Linktree Daraz Link Scraper",
+    "description": "Scrape all links (Daraz by default) from a Linktree profile and export them as JSON or CSV.",
+    "version": "1.0",
+    "meta": {
+        "templateId": "ts-start"
+    },
+    "input": "./input_schema.json",
+    "output": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../Dockerfile"
+}

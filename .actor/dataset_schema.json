@@ -1,0 +1,43 @@
+{
+    "$schema": "https://apify.com/schemas/v1/dataset.ide.json",
+    "actorSpecification": 1,
+    "fields": {},
+    "views": {
+        "overview": {
+            "title": "Links",
+            "transformation": {
+                "fields": [
+                    "title",
+                    "productName",
+                    "price",
+                    "originalPrice",
+                    "images",
+                    "url",
+                    "expandedUrl",
+                    "domain",
+                    "type",
+                    "group",
+                    "detailStatus",
+                    "profileUsername"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "title": { "label": "Link Title", "format": "text" },
+                    "productName": { "label": "Product", "format": "text" },
+                    "price": { "label": "Price", "format": "text" },
+                    "originalPrice": { "label": "Original Price", "format": "text" },
+                    "images": { "label": "Images", "format": "array" },
+                    "url": { "label": "Link URL", "format": "link" },
+                    "expandedUrl": { "label": "Product URL", "format": "link" },
+                    "domain": { "label": "Domain", "format": "text" },
+                    "type": { "label": "Type", "format": "text" },
+                    "group": { "label": "Group", "format": "text" },
+                    "detailStatus": { "label": "Detail Status", "format": "text" },
+                    "profileUsername": { "label": "Profile", "format": "text" }
+                }
+            }
+        }
+    }
+}

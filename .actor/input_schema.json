@@ -1,0 +1,52 @@
+{
+    "$schema": "https://apify.com/schemas/v1/input.ide.json",
+    "title": "Linktree Daraz Link Scraper",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "profileUrl": {
+            "title": "Linktree profile URL",
+            "type": "string",
+            "description": "Full URL of the Linktree profile to scrape, e.g. https://linktr.ee/jasminemaharjan__",
+            "editor": "textfield",
+            "prefill": "https://linktr.ee/jasminemaharjan__",
+            "pattern": "^https?://(www\\.)?linktr\\.ee/.+"
+        },
+        "linkFilter": {
+            "title": "Link filter (hostname contains)",
+            "type": "string",
+            "description": "Only keep links whose hostname contains this text (case-insensitive). Leave EMPTY (the default) to return EVERY link on the profile. Set it to e.g. 'daraz' to keep only daraz.com.np, s.daraz.com.np and click.daraz.com.np links.",
+            "editor": "textfield",
+            "default": "",
+            "prefill": ""
+        },
+        "scrapeProductDetails": {
+            "title": "Scrape product details (price + images)",
+            "type": "boolean",
+            "description": "For each Daraz link, also fetch the product to extract price, original/discounted price and the image gallery. Makes ~2 extra requests per link, so runs slower. Strongly recommended to enable Apify Proxy with Nepal (NP) residential IPs.",
+            "default": false
+        },
+        "expandShortLinks": {
+            "title": "Expand short links only",
+            "type": "boolean",
+            "description": "Resolve each short link to its final product URL (without scraping price/images). Ignored when 'Scrape product details' is on, since that resolves the URL anyway.",
+            "default": false
+        },
+        "maxConcurrency": {
+            "title": "Max concurrency",
+            "type": "integer",
+            "description": "How many links to process in parallel when expanding or scraping product details.",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20
+        },
+        "proxyConfiguration": {
+            "title": "Proxy configuration",
+            "type": "object",
+            "description": "Proxy settings. For product scraping, use Apify Proxy with RESIDENTIAL group and country NP (Nepal) for the best success rate against Daraz bot protection.",
+            "editor": "proxy",
+            "default": { "useApifyProxy": true }
+        }
+    },
+    "required": ["profileUrl"]
+}
