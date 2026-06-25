@@ -24,7 +24,7 @@
             "title": "Scrape product details (price + images)",
             "type": "boolean",
             "description": "For each Daraz link, also fetch the product to extract price, original/discounted price and the image gallery. Makes ~2 extra requests per link, so runs slower. Strongly recommended to enable Apify Proxy with Nepal (NP) residential IPs.",
-            "default": false
+            "default": true
         },
         "expandShortLinks": {
             "title": "Expand short links only",

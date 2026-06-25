@@ -7,7 +7,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 
 // Network-free parsing helpers (unit-tested in test/scrape.test.ts).
 import {
-    extractImages,
+    extractOgImage,
     extractPdpName,
     extractPdpPrice,
     extractPreview,
@@ -74,7 +74,7 @@ const {
     profileUrl,
     linkFilter = '',
     expandShortLinks = false,
-    scrapeProductDetails = false,
+    scrapeProductDetails = true,
     maxConcurrency = 5,
     proxyConfiguration: proxyInput,
 } = input;
@@ -240,12 +240,10 @@ async function scrapeDarazProduct(url: string): Promise<ProductDetails> {
     }
     if (looksBlocked(pdpHtml)) return { ...empty, resolvedUrl, detailStatus: 'blocked' };
 
-    // Images come from the product-scoped JSON-LD / og:image (see extractImages),
-    // falling back to the preview's og:image if the PDP gallery couldn't be read.
-    let images = extractImages(pdpHtml);
-    if (images.length === 0 && preview.mainImage && isProductImage(preview.mainImage)) {
-        images = [preview.mainImage];
-    }
+    // Single product image: the PDP's og:image, falling back to the share page's
+    // og:image. Both live on Daraz CDN hosts validated by isProductImage.
+    const ogImg = extractOgImage(pdpHtml) ?? preview.mainImage;
+    const images = ogImg && isProductImage(ogImg) ? [ogImg] : [];
 
     // Price/name come from the short-link preview first; fall back to the PDP
     // HTML we already fetched (JSON-LD offers / inlined priceText / og:title),

@@ -42,6 +42,9 @@ export function isProductImage(url: string): boolean {
     const host = u.hostname.toLowerCase();
     const path = u.pathname.toLowerCase();
     if (CHROME_PATH_MARKERS.some((m) => path.includes(m))) return false;
+    // Daraz serves product/share images from static-*.daraz.com.np under /p/ (the
+    // og:image on share pages and the JSON-LD gallery both live here).
+    if (host.endsWith('.daraz.com.np') && path.startsWith('/p/')) return true;
     if (host === 'img.drz.lazcdn.com' && path.includes('/p/')) return true;
     if (host === 'filebroker-cdn.lazada.sg' && path.startsWith('/kf/')) return true;
     if (host.endsWith('.slatic.net') && /\.(jpg|jpeg|png|webp)/.test(path) && !path.includes('/domino/')) return true;
@@ -179,9 +182,17 @@ function extractTitleTag(html: string): string | null {
  * first, then og:title, then the <title> tag. Used as a fallback when the
  * short-link preview page didn't carry a "Product Name:" description.
  */
+/** Drop the trailing " | Daraz.com.np" store suffix Daraz appends to og:title/<title>. */
+function stripDarazSuffix(name: string | null): string | null {
+    if (!name) return name;
+    return name.replace(/\s*\|\s*Daraz\.com\.np\s*$/i, '').trim() || null;
+}
+
 export function extractPdpName(html: string): string | null {
     return (
-        extractJsonLdProduct(html).name ?? decodeEntities(extractOgTitle(html)) ?? decodeEntities(extractTitleTag(html))
+        extractJsonLdProduct(html).name ??
+        stripDarazSuffix(decodeEntities(extractOgTitle(html))) ??
+        stripDarazSuffix(decodeEntities(extractTitleTag(html)))
     );
 }
 
@@ -189,6 +200,9 @@ export function extractPdpName(html: string): string | null {
 // `"price":"1234"`; these mirror the proven fallbacks in scraper-service's
 // affiliate-scraper. JSON-LD offers are read separately via extractJsonLdProduct.
 const PRICE_TEXT_RE = /"priceText":"([^"]+)"/i;
+// Daraz's PDP tracking JSON inlines the authoritative price as a pre-formatted
+// `"pdt_price":"Rs. 1,234"` — more reliable than scanning for any visible Rs. amount.
+const PDT_PRICE_RE = /"pdt_price":"([^"]+)"/i;
 const RAW_PRICE_RE = /"price":"([^"]+)"/i;
 
 /**
@@ -200,6 +214,9 @@ const RAW_PRICE_RE = /"price":"([^"]+)"/i;
 export function extractPdpPrice(html: string): string | null {
     const priceText = decodeEntities(html.match(PRICE_TEXT_RE)?.[1]);
     if (priceText) return priceText;
+
+    const pdtPrice = decodeEntities(html.match(PDT_PRICE_RE)?.[1]);
+    if (pdtPrice) return /^rs|npr|रू/i.test(pdtPrice) ? pdtPrice : `Rs. ${pdtPrice}`;
 
     const jsonLdPrice = extractJsonLdProduct(html).price;
     if (jsonLdPrice) return /^rs|npr|रू/i.test(jsonLdPrice) ? jsonLdPrice : `Rs. ${jsonLdPrice}`;

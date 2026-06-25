@@ -34,7 +34,9 @@ describe('isProductImage', () => {
     it('accepts real product CDN images and rejects UI chrome', () => {
         expect(isProductImage('https://img.drz.lazcdn.com/static/np/p/abc.png_720x720q80.png')).toBe(true);
         expect(isProductImage('https://np-live-21.slatic.net/kf/Sxyz.png')).toBe(true);
+        expect(isProductImage('https://static-01.daraz.com.np/p/f02363fada0bda043091e70ad7587518.jpg')).toBe(true);
         expect(isProductImage('https://img.drz.lazcdn.com/g/tps/logo.png')).toBe(false);
+        expect(isProductImage('https://static-01.daraz.com.np/icon/logo.png')).toBe(false);
         expect(isProductImage('https://laz-img-cdn.alicdn.com/domino/banner.jpg')).toBe(false);
     });
 });
@@ -125,6 +127,11 @@ describe('extractPdpPrice', () => {
 
     it('prefers an inlined priceText over everything', () => {
         expect(extractPdpPrice(`<script>{"priceText":"Rs. 1,299"}</script>`)).toBe('Rs. 1,299');
+    });
+
+    it('reads the pdt_price tracking field, beating a stray visible Rs. amount', () => {
+        const html = `<div>Save Rs. 100 today</div><script>{"pdt_price":"Rs. 3,900"}</script>`;
+        expect(extractPdpPrice(html)).toBe('Rs. 3,900');
     });
 
     it('falls back to a bare "price" field, then a visible Rs. amount', () => {
