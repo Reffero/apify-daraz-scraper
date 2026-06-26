@@ -218,17 +218,22 @@ async function scrapeDarazProduct(url: string): Promise<ProductDetails> {
 
     const preview = extractPreview(previewHtml);
 
-    // Step 2: resolve to the actual product page. Either follow the share page's
-    // tracking redirect, or use the page we already have if it's a product URL.
+    // Step 2: resolve to the actual product page. The share page's REDIRECTURL
+    // (preview.trackingUrl) ALREADY is the canonical product URL, so capture it up
+    // front: a blocked/failed PDP fetch (common from datacenter IPs) must still
+    // yield the resolved product URL. The PDP fetch below is best-effort enrichment
+    // for images/price/name only.
     let pdpHtml = '';
-    let resolvedUrl: string | null = null;
+    let resolvedUrl: string | null =
+        preview.trackingUrl && isDarazProductUrl(preview.trackingUrl) ? preview.trackingUrl : null;
     if (preview.trackingUrl) {
         const pdp = await getPage(preview.trackingUrl, { maxRedirects: 10, timeout: 30_000 });
-        if (!pdp.data) {
-            return { ...empty, detailStatus: pdp.status ? `http-${pdp.status}` : 'fetch-failed' };
+        if (pdp.data) {
+            pdpHtml = pdp.data;
+            // Prefer the fetch's final URL when it lands on a real product page;
+            // otherwise keep the canonical URL we already pulled from REDIRECTURL.
+            if (isDarazProductUrl(pdp.finalUrl)) resolvedUrl = pdp.finalUrl;
         }
-        pdpHtml = pdp.data;
-        resolvedUrl = pdp.finalUrl;
     } else if (isDarazProductUrl(previewFinalUrl)) {
         pdpHtml = previewHtml;
         resolvedUrl = previewFinalUrl;

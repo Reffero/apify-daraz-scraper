@@ -111,9 +111,9 @@ describe('extractPdpName', () => {
     });
 
     it('falls back to og:title then <title>', () => {
-        expect(
-            extractPdpName(`<head><meta property="og:title" content="Cool Watch &amp; Strap" /></head>`),
-        ).toBe('Cool Watch & Strap');
+        expect(extractPdpName(`<head><meta property="og:title" content="Cool Watch &amp; Strap" /></head>`)).toBe(
+            'Cool Watch & Strap',
+        );
         expect(extractPdpName(`<head><title>Plain Title | Daraz</title></head>`)).toBe('Plain Title | Daraz');
         expect(extractPdpName(`<head></head><body></body>`)).toBeNull();
     });
@@ -155,5 +155,21 @@ describe('extractPreview', () => {
         expect(preview.salePrice).toBe('Rs.3,499');
         expect(preview.trackingUrl).toBe('https://c.daraz.com.np/t/abc123?redirect=1');
         expect(preview.mainImage).toBe('https://img.drz.lazcdn.com/static/np/p/main.png_720x720q80.png');
+    });
+
+    it('extracts the canonical product URL from a REDIRECTURL share page', () => {
+        // Real s.daraz.com.np share pages carry no c.daraz.com.np/t/ link and an
+        // empty og:description — the product URL only lives in the JS REDIRECTURL.
+        const productUrl =
+            'https://www.daraz.com.np/products/erke-jogging-shoes-i1512958463-s12352624059.html?from_affiliate=1&laz_token=abc';
+        const html = `<head>
+        <meta property="og:image" content="https://img.alicdn.com/imgextra/i4/logo.png" />
+        <script>REDIRECTURL = new URL('${productUrl}'); window.location = REDIRECTURL;</script>
+        </head>`;
+        const preview = extractPreview(html);
+        expect(preview.trackingUrl).toBe(productUrl);
+        // This is what main.ts now uses to populate expandedUrl even when the PDP
+        // fetch is blocked from a datacenter IP.
+        expect(isDarazProductUrl(preview.trackingUrl)).toBe(true);
     });
 });
