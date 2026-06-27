@@ -1,11 +1,11 @@
 {
     "$schema": "https://apify.com/schemas/v1/output.ide.json",
     "actorOutputSchemaVersion": 1,
-    "title": "Output schema",
+    "title": "Linktree Daraz affiliate scraper output",
     "properties": {
         "results": {
             "type": "string",
-            "title": "Scraped links",
+            "title": "Daraz affiliate links",
             "template": "{{links.apiDefaultDatasetUrl}}/items"
         }
     }

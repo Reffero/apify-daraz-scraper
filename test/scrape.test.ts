@@ -6,9 +6,19 @@ import {
     extractPdpName,
     extractPdpPrice,
     extractPreview,
+    isDarazHost,
     isDarazProductUrl,
     isProductImage,
 } from '../src/scrape.js';
+
+describe('isDarazHost', () => {
+    it('accepts Daraz Nepal links and rejects lookalike and unrelated hosts', () => {
+        expect(isDarazHost('https://s.daraz.com.np/s.example')).toBe(true);
+        expect(isDarazHost('https://www.daraz.com.np/products/example-i123.html')).toBe(true);
+        expect(isDarazHost('https://evildaraz.com.np/s.example')).toBe(false);
+        expect(isDarazHost('https://example.com/?url=daraz.com.np')).toBe(false);
+    });
+});
 
 describe('isDarazProductUrl', () => {
     it('accepts real Daraz product URLs', () => {

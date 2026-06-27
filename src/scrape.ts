@@ -11,6 +11,12 @@ export function hostnameOf(url: string): string {
     }
 }
 
+/** Accept Daraz Nepal itself and its subdomains, without suffix-spoofed hosts. */
+export function isDarazHost(url: string): boolean {
+    const host = hostnameOf(url);
+    return host === 'daraz.com.np' || host.endsWith('.daraz.com.np');
+}
+
 // Daraz canonical product URLs embed the product id as `-i<digits>` (optionally
 // followed by `-s<digits>`), e.g. `.../foo-i123456789-s987654321.html`. This is
 // the same pattern the backend uses to derive the dedup id (scraper-service
@@ -24,8 +30,7 @@ export const DARAZ_PRODUCT_RE = /-i(\d+)(?:-s\d+)?\.html/i;
  */
 export function isDarazProductUrl(url: string | null | undefined): boolean {
     if (!url) return false;
-    const host = hostnameOf(url);
-    if (!host.endsWith('daraz.com.np')) return false;
+    if (!isDarazHost(url)) return false;
     return DARAZ_PRODUCT_RE.test(url);
 }
 
@@ -65,7 +70,7 @@ const JSON_LD_RE = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*
 function imageUrlFromNode(value: unknown): string | null {
     if (typeof value === 'string') return value;
     if (value && typeof value === 'object') {
-        const {url} = (value as Record<string, unknown>);
+        const { url } = value as Record<string, unknown>;
         if (typeof url === 'string') return url;
     }
     return null;
@@ -81,49 +86,46 @@ interface JsonLdProduct {
 /** Pull `offers.price` / `offers.lowPrice` out of a Product node, as a string. */
 function priceFromOffers(offers: unknown): string | null {
     if (!offers || typeof offers !== 'object') return null;
-    const {price, lowPrice} = offers as Record<string, unknown>;
+    const { price, lowPrice } = offers as Record<string, unknown>;
     const raw = price ?? lowPrice;
     if (typeof raw === 'string' && raw.trim()) return raw.trim();
     if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
     return null;
 }
 
-/** Walk JSON-LD (object, array, or @graph) and collect Product name/price/images. */
-function collectJsonLdProduct(parsed: unknown, out: JsonLdProduct): void {
-    if (Array.isArray(parsed)) {
-        for (const node of parsed) collectJsonLdProduct(node, out);
-        return;
-    }
-    if (!parsed || typeof parsed !== 'object') return;
-
-    const node = parsed as Record<string, unknown>;
-    if (Array.isArray(node['@graph'])) {
-        for (const child of node['@graph']) collectJsonLdProduct(child, out);
-    }
-
-    const type = node['@type'];
-    const isProduct = type === 'Product' || (Array.isArray(type) && type.includes('Product'));
-    if (!isProduct) return;
-
-    const {image} = node;
-    const entries = Array.isArray(image) ? image : [image];
-    for (const entry of entries) {
-        const url = imageUrlFromNode(entry);
-        if (url) out.images.push(url);
-    }
-
-    if (!out.name) out.name = decodeEntities(typeof node.name === 'string' ? node.name : null);
-    if (!out.price) out.price = priceFromOffers(node.offers);
-}
-
 /** Parse every JSON-LD block on the page into one product-scoped result. */
 function extractJsonLdProduct(html: string): JsonLdProduct {
-    const out: JsonLdProduct = {images: [], name: null, price: null};
+    const out: JsonLdProduct = { images: [], name: null, price: null };
+    const collect = (parsed: unknown): void => {
+        if (Array.isArray(parsed)) {
+            for (const item of parsed) collect(item);
+            return;
+        }
+        if (!parsed || typeof parsed !== 'object') return;
+
+        const node = parsed as Record<string, unknown>;
+        if (Array.isArray(node['@graph'])) {
+            for (const child of node['@graph']) collect(child);
+        }
+
+        const type = node['@type'];
+        const isProduct = type === 'Product' || (Array.isArray(type) && type.includes('Product'));
+        if (!isProduct) return;
+
+        const entries = Array.isArray(node.image) ? node.image : [node.image];
+        for (const entry of entries) {
+            const url = imageUrlFromNode(entry);
+            if (url) out.images.push(url);
+        }
+        out.name ||= decodeEntities(typeof node.name === 'string' ? node.name : null);
+        out.price ||= priceFromOffers(node.offers);
+    };
+
     for (const match of html.matchAll(JSON_LD_RE)) {
         const raw = match[1]?.trim();
         if (!raw) continue;
         try {
-            collectJsonLdProduct(JSON.parse(raw), out);
+            collect(JSON.parse(raw));
         } catch {
             // ignore malformed JSON-LD blocks
         }
@@ -204,6 +206,7 @@ const PRICE_TEXT_RE = /"priceText":"([^"]+)"/i;
 // `"pdt_price":"Rs. 1,234"` — more reliable than scanning for any visible Rs. amount.
 const PDT_PRICE_RE = /"pdt_price":"([^"]+)"/i;
 const RAW_PRICE_RE = /"price":"([^"]+)"/i;
+const PRICE_RE = '(?:Rs\\.?|NPR|रू)\\s?[\\d,]+(?:\\.\\d+)?';
 
 /**
  * Best-effort price from a Daraz PDP, layering the strategies that reliably hit
@@ -240,8 +243,6 @@ export function decodeEntities(s: string | null | undefined): string | null {
             .trim() || null
     );
 }
-
-const PRICE_RE = '(?:Rs\\.?|NPR|रू)\\s?[\\d,]+(?:\\.\\d+)?';
 
 /** Data extracted from a Daraz short-link "preview" page (has price + main image). */
 export interface PreviewData {

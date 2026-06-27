@@ -1,95 +1,90 @@
-# Linktree Daraz Link Scraper
+## What does Linktree Daraz Affiliate Scraper do?
 
-An [Apify Actor](https://apify.com/actors) that opens a [Linktree](https://linktr.ee) profile, extracts its links, and — optionally — visits each Daraz product to pull the **price** and **image gallery**.
+**Linktree Daraz Affiliate Scraper** reads a public [Linktree](https://linktr.ee/) profile and returns every Daraz Nepal affiliate link together with its product name, current displayed price, and Open Graph image. Paste a profile URL such as `https://linktr.ee/Razeemaharjan` into the Input tab to try it.
 
-By default it returns only **Daraz** links (`daraz.com.np`, `s.daraz.com.np`, `click.daraz.com.np`), but the filter can be any domain, or empty to return every link.
+Runs on the Apify platform can be started through the Console or API, scheduled, monitored, and connected to other services. Apify storage also makes the results easy to download in common formats. The Actor keeps broken affiliate links in the output and labels them `invalid`, so missing or expired links do not silently disappear.
 
-Results land in a [dataset](https://docs.apify.com/platform/storage/dataset) which you can **export as JSON, CSV, Excel, HTML, or XML** with one click (or via the API).
+## Why use Linktree Daraz Affiliate Scraper?
+
+Use this Actor to audit a creator's affiliate catalog, import product cards into another application, check for expired promotional links, or build a structured product feed from a Linktree page. Each link is handled independently, so one unavailable product does not prevent the other results from being collected.
+
+## How to scrape Daraz links from Linktree
+
+1. Open the Actor in Apify Console.
+2. Enter the complete public Linktree profile URL.
+3. Click **Start** and wait for the run to finish.
+4. Open the run's **Output** or **Dataset** tab.
+5. Export or integrate the resulting product records.
+
+No selectors, filters, or concurrency settings are required. The Actor automatically identifies Daraz Nepal links and resolves short affiliate URLs internally.
 
 ## Input
 
-| Field                  | Type              | Default        | Description                                                                                                       |
-| ---------------------- | ----------------- | -------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `profileUrl`           | string (required) | –              | The Linktree URL, e.g. `https://linktr.ee/jasminemaharjan__`                                                      |
-| `linkFilter`           | string            | `daraz`        | Keep links whose **hostname** contains this text (case-insensitive). Leave **empty** to return every link.        |
-| `scrapeProductDetails` | boolean           | `false`        | For each Daraz link, also fetch the product page to extract price, original price and image gallery.              |
-| `expandShortLinks`     | boolean           | `false`        | Resolve short links to their final product URL only (no price/images). Ignored when `scrapeProductDetails` is on. |
-| `maxConcurrency`       | integer           | `5`            | How many links to process in parallel.                                                                            |
-| `proxyConfiguration`   | object            | Apify Proxy on | Proxy settings. For product scraping, use **RESIDENTIAL** proxies in **Nepal (NP)**.                              |
+The Input tab contains one required field:
 
-Example input:
+| Field        | Type   | Description                                                                     |
+| ------------ | ------ | ------------------------------------------------------------------------------- |
+| `profileUrl` | string | Full public Linktree profile URL, for example `https://linktr.ee/Razeemaharjan` |
+
+Example:
 
 ```json
 {
-    "profileUrl": "https://linktr.ee/jasminemaharjan__",
-    "linkFilter": "daraz",
-    "scrapeProductDetails": true,
-    "maxConcurrency": 5,
-    "proxyConfiguration": { "useApifyProxy": true, "apifyProxyGroups": ["RESIDENTIAL"], "apifyProxyCountry": "NP" }
+    "profileUrl": "https://linktr.ee/Razeemaharjan"
 }
 ```
 
 ## Output
 
-Each dataset row is one link. With `scrapeProductDetails` on, the product fields are populated:
+Each dataset item represents one unique Daraz affiliate URL found on the profile:
 
 ```json
-{
-    "profileUsername": "jasminemaharjan__",
-    "title": "ULTIMA DARAZ 11:11 DEALS",
-    "url": "https://s.daraz.com.np/s.qGoh",
-    "expandedUrl": "https://www.daraz.com.np/products/ultima-prime-10-anc-earbuds-...-i...html",
-    "productName": "Ultima Prime 1.0 ANC Earbuds with App Support",
-    "price": "Rs.3,499",
-    "originalPrice": "Rs.4,499",
-    "images": [
-        "https://img.drz.lazcdn.com/static/np/p/8a072958ea0c4d6d77aa3f38c7de004a.png_720x720q80.png",
-        "https://np-live-21.slatic.net/kf/Se8a4a1fcf5e149d18acbd2d202e00180X.png"
-    ],
-    "domain": "s.daraz.com.np",
-    "type": "CLASSIC",
-    "group": "ULTIMA DARAZ 11:11 DEALS",
-    "position": 0,
-    "detailStatus": "ok",
-    "scrapedAt": "2026-06-24T10:05:54.649Z"
-}
+[
+    {
+        "affiliateUrl": "https://s.daraz.com.np/s.example",
+        "productName": "Example wireless earbuds",
+        "price": "Rs. 3,499",
+        "ogImage": "https://img.drz.lazcdn.com/static/np/p/example.jpg",
+        "status": "valid"
+    },
+    {
+        "affiliateUrl": "https://s.daraz.com.np/s.expired",
+        "productName": null,
+        "price": null,
+        "ogImage": null,
+        "status": "invalid"
+    }
+]
 ```
 
-| Field           | Description                                              |
-| --------------- | -------------------------------------------------------- |
-| `title`         | Link title shown on the Linktree profile                 |
-| `productName`   | Product name from the Daraz page (when scraping details) |
-| `price`         | Selling price (the discounted price if there is one)     |
-| `originalPrice` | Original/list price, when the item is discounted         |
-| `images`        | Array of product image URLs (gallery)                    |
-| `url`           | The Linktree link (often a short link)                   |
-| `expandedUrl`   | The resolved Daraz product URL                           |
-| `domain`        | Hostname of the link                                     |
-| `type`          | Linktree link type (`CLASSIC`, etc.)                     |
-| `group`         | Title of the section the link sits under                 |
-| `detailStatus`  | `ok`, `blocked`, `no-data`, `http-404`, etc.             |
-| `scrapedAt`     | ISO timestamp of the run                                 |
+You can download the dataset in various formats such as JSON, HTML, CSV, or Excel.
 
-### Getting JSON or CSV
+## Data table
 
-On the run's **Storage → Dataset** tab, click **Export** and pick the format, or call:
+| Field          | Description                                                         |
+| -------------- | ------------------------------------------------------------------- |
+| `affiliateUrl` | Original Daraz affiliate link found on Linktree                     |
+| `productName`  | Daraz product name, or `null` for an invalid link                   |
+| `price`        | Display-formatted selling price, or `null`                          |
+| `ogImage`      | Validated product Open Graph image URL, or `null`                   |
+| `status`       | `valid` when all product fields were extracted; otherwise `invalid` |
 
-```
-https://api.apify.com/v2/datasets/<DATASET_ID>/items?format=csv
-https://api.apify.com/v2/datasets/<DATASET_ID>/items?format=json
-```
+The resolved Daraz product URL is used internally for validation but is not included in output.
 
-## How it works
+## How much does it cost to scrape Linktree and Daraz?
 
-1. The Linktree profile is fetched and its links read from the embedded `__NEXT_DATA__` JSON, then filtered by hostname.
-2. With `scrapeProductDetails` on, each Daraz link is visited as a two-step process:
-    - The short link (`s.daraz.com.np/...`) returns a small **preview page** that carries the **price** and **original price** (in its meta description) plus the main image.
-    - That preview contains a `c.daraz.com.np` tracking redirect, which is followed to the **real product page** to read the full **image gallery** and the canonical product URL.
-3. Everything is pushed to the dataset.
+Cost depends mainly on the number of Daraz links and the proxy traffic needed to access their product pages. Small Linktree profiles generally require only a short run. Apify's free tier may be enough for occasional small jobs; check your current Apify plan and usage limits for exact pricing. Larger or frequent audits should be tested with a representative profile before scheduling.
 
-## Important notes on Daraz
+## Tips and advanced options
 
-- **Bot protection.** Daraz (Lazada/Alibaba infrastructure) actively blocks datacenter IPs. For reliable product scraping, enable **Apify Proxy → RESIDENTIAL → country NP**. Without it, expect a share of rows to come back `blocked`.
-- **Price source.** Daraz no longer embeds the price in the product page's initial HTML (it is loaded by JavaScript), so the price is read from the share/preview page instead. If Daraz changes the preview format, the price parser may need a small update; images are read from the product page itself.
-- **Non-product links.** Campaign/deal links (`click.daraz.com.np/e/...`) are not single products, so they will usually have no price and few or no images (`detailStatus: no-data`).
-- **Profiles that 404.** If the profile doesn't exist, is private, or was renamed, the Actor fails with a clear message. Check the exact username, including trailing characters like `_`.
+Daraz may block datacenter traffic or ask for human verification. On Apify, the Actor attempts to use Apify Proxy and falls back to a direct connection when proxy access is unavailable. A blocked response is retained as an `invalid` row rather than guessed from incomplete data.
+
+For reliable monitoring, schedule repeat runs and compare records by `affiliateUrl`. If a previously valid row becomes invalid, verify the link manually before removing it because temporary blocking can look like an expired link.
+
+## FAQ, disclaimers, and support
+
+**Why is a link marked invalid?** It may be expired, lead to a campaign instead of a product, be temporarily blocked, or lack a product name, price, or image.
+
+**Does the Actor modify affiliate links?** No. `affiliateUrl` is exactly the link collected from Linktree; redirect resolution is internal.
+
+Only scrape public pages and ensure your use complies with Linktree's and Daraz's terms, robots policies, and applicable law. Product prices and availability can change after a run. Use the Actor's **Issues** tab to report reproducible problems or request a custom integration.

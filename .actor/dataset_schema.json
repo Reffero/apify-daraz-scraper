@@ -1,41 +1,27 @@
 {
     "$schema": "https://apify.com/schemas/v1/dataset.ide.json",
     "actorSpecification": 1,
-    "fields": {},
+    "fields": {
+        "affiliateUrl": { "type": "string", "format": "uri" },
+        "productName": { "type": ["string", "null"] },
+        "price": { "type": ["string", "null"] },
+        "ogImage": { "type": ["string", "null"] },
+        "status": { "type": "string", "enum": ["valid", "invalid"] }
+    },
     "views": {
         "overview": {
-            "title": "Links",
+            "title": "Daraz affiliate links",
             "transformation": {
-                "fields": [
-                    "title",
-                    "productName",
-                    "price",
-                    "originalPrice",
-                    "images",
-                    "url",
-                    "expandedUrl",
-                    "domain",
-                    "type",
-                    "group",
-                    "detailStatus",
-                    "profileUsername"
-                ]
+                "fields": ["affiliateUrl", "productName", "price", "ogImage", "status"]
             },
             "display": {
                 "component": "table",
                 "properties": {
-                    "title": { "label": "Link Title", "format": "text" },
+                    "affiliateUrl": { "label": "Affiliate URL", "format": "link" },
                     "productName": { "label": "Product", "format": "text" },
                     "price": { "label": "Price", "format": "text" },
-                    "originalPrice": { "label": "Original Price", "format": "text" },
-                    "images": { "label": "Images", "format": "array" },
-                    "url": { "label": "Link URL", "format": "link" },
-                    "expandedUrl": { "label": "Product URL", "format": "link" },
-                    "domain": { "label": "Domain", "format": "text" },
-                    "type": { "label": "Type", "format": "text" },
-                    "group": { "label": "Group", "format": "text" },
-                    "detailStatus": { "label": "Detail Status", "format": "text" },
-                    "profileUsername": { "label": "Profile", "format": "text" }
+                    "ogImage": { "label": "Image", "format": "image" },
+                    "status": { "label": "Status", "format": "text" }
                 }
             }
         }
