@@ -11,6 +11,15 @@
             "editor": "textfield",
             "prefill": "https://linktr.ee/Razeemaharjan",
             "pattern": "^https?://(www\\.)?linktr\\.ee/.+"
+        },
+        "maxConcurrency": {
+            "title": "Max concurrency",
+            "type": "integer",
+            "description": "How many Daraz links to resolve in parallel. Each request uses a fresh residential proxy IP, so higher values are faster and spread load across more IPs. Too high can exhaust the Nepal residential pool and raise the blocked/invalid rate.",
+            "editor": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 50
         }
     },
     "required": ["profileUrl"]

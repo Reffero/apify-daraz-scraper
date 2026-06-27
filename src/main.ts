@@ -17,7 +17,15 @@ import {
 
 interface Input {
     profileUrl: string;
+    maxConcurrency?: number;
 }
+
+// Each scrape pulls a fresh residential IP, so parallel links spread across IPs
+// rather than hammering one — higher concurrency is faster AND safer per-IP. The
+// ceiling guards the (scarce) Nepal residential pool: past it, IPs recycle and the
+// blocked/invalid rate climbs. Default is tuned for speed on a typical profile.
+const DEFAULT_CONCURRENCY = 20;
+const MAX_CONCURRENCY = 50;
 
 interface LinktreeLink {
     id: number;
@@ -60,6 +68,8 @@ if (!input?.profileUrl || !/^https?:\/\/(www\.)?linktr\.ee\/.+/i.test(input.prof
 }
 
 const profileUrl = input.profileUrl.trim().split('?')[0].replace(/\/+$/, '');
+
+const concurrency = Math.min(Math.max(Math.trunc(input.maxConcurrency ?? DEFAULT_CONCURRENCY), 1), MAX_CONCURRENCY);
 
 let proxyConfiguration: Awaited<ReturnType<typeof Actor.createProxyConfiguration>>;
 try {
@@ -210,8 +220,9 @@ for (const link of rawLinks) {
 const links = [...uniqueLinks.values()].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 log.info(`Found ${links.length} unique Daraz affiliate link(s).`);
 
+log.info(`Resolving links with concurrency ${concurrency}.`);
 let processed = 0;
-const rows = await mapPool(links, 5, async (link): Promise<OutputRow> => {
+const rows = await mapPool(links, concurrency, async (link): Promise<OutputRow> => {
     const affiliateUrl = link.url.trim();
     let details: ProductDetails = { productName: null, price: null, ogImage: null };
     try {
